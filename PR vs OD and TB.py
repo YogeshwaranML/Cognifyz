@@ -1,37 +1,99 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
 
-# Load the dataset
-# Assuming the file is saved as 'Dataset.csv' in the same directory
-df = pd.read_csv(r"C:\Users\mlyog\Downloads\Dataset .csv", encoding='latin-1') # Using latin-1 to avoid utf-8 decoding errors
+# ============================================
+# Load and Prepare Data
+# ============================================
+df = pd.read_csv('Dataset .csv')
 
-print("📊 Analysis: Price Range vs. Services Offered 📊\n")
+# Clean data - drop rows with missing price range
+df = df.dropna(subset=['Price range'])
 
-# 1. Table Booking Analysis
-# Group by Price range and calculate the percentage of 'Yes' for Table Booking
-booking_analysis = df.groupby('Price range')['Has Table booking'].apply(
-    lambda x: (x == 'Yes').mean() * 100
-).reset_index()
-booking_analysis.columns = ['Price Range', 'Table Booking Availability (%)']
+# ============================================
+# Analyze Table Booking by Price Range
+# ============================================
+table_booking = df.groupby(['Price range', 'Has Table booking']).size().unstack(fill_value=0)
 
-print("🍽️ Table Booking Availability by Price Range:")
-print(booking_analysis.to_string(index=False))
-print("-" * 50)
+# ============================================
+# Analyze Online Delivery by Price Range
+# ============================================
+online_delivery = df.groupby(['Price range', 'Has Online delivery']).size().unstack(fill_value=0)
 
-# 2. Online Delivery Analysis
-# Group by Price range and calculate the percentage of 'Yes' for Online Delivery
-delivery_analysis = df.groupby('Price range')['Has Online delivery'].apply(
-    lambda x: (x == 'Yes').mean() * 100
-).reset_index()
-delivery_analysis.columns = ['Price Range', 'Online Delivery Availability (%)']
+# Print Summary Statistics
+print("=" * 55)
+print("  PRICE RANGE vs. SERVICE AVAILABILITY")
+print("=" * 55)
 
-print("🛵 Online Delivery Availability by Price Range:")
-print(delivery_analysis.to_string(index=False))
-print("-" * 50)
+for pr in sorted(df['Price range'].unique()):
+    total = len(df[df['Price range'] == pr])
+    tb_yes = len(df[(df['Price range'] == pr) & (df['Has Table booking'] == 'Yes')])
+    od_yes = len(df[(df['Price range'] == pr) & (df['Has Online delivery'] == 'Yes')])
+    print(f"\n  Price Range {pr} (Total: {total} restaurants)")
+    print(f"    Table Booking:   {tb_yes:>5} ({tb_yes/total*100:.1f}%)")
+    print(f"    Online Delivery: {od_yes:>5} ({od_yes/total*100:.1f}%)")
 
-# 3. Overall Conclusion Logic
-print("💡 Insight Generation:")
-highest_booking = booking_analysis.loc[booking_analysis['Table Booking Availability (%)'].idxmax()]
-highest_delivery = delivery_analysis.loc[delivery_analysis['Online Delivery Availability (%)'].idxmax()]
+# ============================================
+# Create Stacked Column Chart
+# ============================================
+fig, axes = plt.subplots(1, 2, figsize=(16, 7))
 
-print(f"-> Table Booking is most common in Price Range {int(highest_booking['Price Range'])} ({highest_booking['Table Booking Availability (%)']:.2f}%).")
-print(f"-> Online Delivery is most common in Price Range {int(highest_delivery['Price Range'])} ({highest_delivery['Online Delivery Availability (%)']:.2f}%).")
+# --- Chart 1: Table Booking ---
+if 'No' not in table_booking.columns:
+    table_booking['No'] = 0
+if 'Yes' not in table_booking.columns:
+    table_booking['Yes'] = 0
+
+axes[0].bar(table_booking.index, table_booking['No'], 
+            label='No Table Booking', color='#FF6B6B', edgecolor='white')
+axes[0].bar(table_booking.index, table_booking['Yes'], 
+            bottom=table_booking['No'], label='Has Table Booking', 
+            color='#4ECDC4', edgecolor='white')
+
+# Add percentage labels
+for i, pr in enumerate(table_booking.index):
+    total = table_booking.loc[pr].sum()
+    yes_pct = table_booking.loc[pr, 'Yes'] / total * 100
+    axes[0].text(i, total + 50, f'{yes_pct:.1f}%', 
+                ha='center', fontsize=12, fontweight='bold', color='#2C3E50')
+
+axes[0].set_title('Table Booking by Price Range', fontsize=14, fontweight='bold', pad=15)
+axes[0].set_xlabel('Price Range (1=Low → 4=High)', fontsize=12, fontweight='bold')
+axes[0].set_ylabel('Number of Restaurants', fontsize=12, fontweight='bold')
+axes[0].set_xticks([1, 2, 3, 4])
+axes[0].legend(loc='upper left')
+axes[0].grid(axis='y', alpha=0.3, linestyle='--')
+
+# --- Chart 2: Online Delivery ---
+if 'No' not in online_delivery.columns:
+    online_delivery['No'] = 0
+if 'Yes' not in online_delivery.columns:
+    online_delivery['Yes'] = 0
+
+axes[1].bar(online_delivery.index, online_delivery['No'], 
+            label='No Online Delivery', color='#FFA07A', edgecolor='white')
+axes[1].bar(online_delivery.index, online_delivery['Yes'], 
+            bottom=online_delivery['No'], label='Has Online Delivery', 
+            color='#98D8C8', edgecolor='white')
+
+# Add percentage labels
+for i, pr in enumerate(online_delivery.index):
+    total = online_delivery.loc[pr].sum()
+    yes_pct = online_delivery.loc[pr, 'Yes'] / total * 100
+    axes[1].text(i, total + 50, f'{yes_pct:.1f}%', 
+                ha='center', fontsize=12, fontweight='bold', color='#2C3E50')
+
+axes[1].set_title('Online Delivery by Price Range', fontsize=14, fontweight='bold', pad=15)
+axes[1].set_xlabel('Price Range (1=Low → 4=High)', fontsize=12, fontweight='bold')
+axes[1].set_ylabel('Number of Restaurants', fontsize=12, fontweight='bold')
+axes[1].set_xticks([1, 2, 3, 4])
+axes[1].legend(loc='upper right')
+axes[1].grid(axis='y', alpha=0.3, linestyle='--')
+
+plt.suptitle('Price Range vs. Online Delivery & Table Booking', 
+             fontsize=16, fontweight='bold', y=1.02)
+plt.tight_layout()
+plt.savefig('price_range_services.png', dpi=150, bbox_inches='tight')
+plt.show()
+
+print("\n✅ Stacked column chart generated successfully!")
